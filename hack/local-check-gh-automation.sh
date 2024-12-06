@@ -28,9 +28,13 @@ OC extract configmap/plugins --to "${plugin_dir}"
 OC extract configmap/config --to "${data}/prow"
 
 app_id=$(cat "${data}/appid")
+if [ -n "${2+x}" ]; then
+  candidate_path="--candidate-path=$2"
+fi
 
 os::log::info "Running check-gh-automation"
 go run ./cmd/check-gh-automation --repo="$1" \
+  ${candidate_path:-} \
   --bot=openshift-merge-robot --bot=openshift-ci-robot \
   --github-app-id="$app_id" --github-app-private-key-path="${data}/cert" \
   --config-path="${data}/prow/config.yaml" --supplemental-prow-config-dir="${data}/prow" \
