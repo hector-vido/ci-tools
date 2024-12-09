@@ -122,7 +122,7 @@ func main() {
 	}
 
 	repos := determineRepos(o, prowAgent, logger)
-	failing, err := checkRepos(repos, o.bots.Strings(), o.appName, o.ignore.StringSet(), appCheckMode(o.appCheckMode), o.checkBranchProtection, client, logger, pluginAgent, tideQueries, prowAgent)
+	failing, err := checkRepos(repos, o.bots.Strings(), o.appName, o.ignore.StringSet(), appCheckMode(o.appCheckMode), o.checkBranchProtection, o.releaseRepoPath, client, logger, pluginAgent, tideQueries, prowAgent)
 	if err != nil {
 		logger.Fatalf("error checking repos: %v", err)
 	}
@@ -147,8 +147,9 @@ func determineRepos(o options, prowAgent *prowconfig.Agent, logger *logrus.Entry
 	return sets.List(prowAgent.Config().AllRepos)
 }
 
-func checkRepos(repos []string, bots []string, appName string, ignore sets.Set[string], mode appCheckMode, checkBranchProtection bool, client automationClient, logger *logrus.Entry, pluginAgent *plugins.ConfigAgent, tideQueries *prowconfig.QueryMap, prowAgent *prowconfig.Agent) ([]string, error) {
+func checkRepos(repos []string, bots []string, appName string, ignore sets.Set[string], mode appCheckMode, checkBranchProtection bool, releaseRepoPath string, client automationClient, logger *logrus.Entry, pluginAgent *plugins.ConfigAgent, tideQueries *prowconfig.QueryMap, prowAgent *prowconfig.Agent) ([]string, error) {
 	logger.Infof("checking %d repo(s): %s", len(repos), strings.Join(repos, ", "))
+	configs, _ := config.GetAllConfigs(releaseRepoPath)
 	failing := sets.New[string]()
 	for _, orgRepo := range repos {
 		split := strings.Split(orgRepo, "/")
@@ -162,6 +163,28 @@ func checkRepos(repos []string, bots []string, appName string, ignore sets.Set[s
 		if err != nil {
 			logger.Errorf("Error obtaining repository from github: %s/%s: %v", org, repo, err)
 			return nil, fmt.Errorf("error obtaining repository from github: %s/%s: %w", org, repo, err)
+		}
+
+		configData, found := config.DataWithInfo{}, false
+		if configs.Prow != nil {
+			configData, found = configs.CiOperator[fmt.Sprintf("%s-%s-master.yaml", org, repo)]
+			if !found {
+				logger.Infof("The \"master\" file was not found, searching for \"main\".")
+				configData, found = configs.CiOperator[fmt.Sprintf("%s-%s-main.yaml", org, repo)]
+				if !found {
+					logger.Infof("The \"main\" file was found for repo %s/%s, skiping autobranching verification.", org, repo)
+				}
+			}
+			if configData.Configuration.PromotionConfiguration != nil {
+				for _, target := range configData.Configuration.PromotionConfiguration.Targets {
+					if target.Namespace == "ocp" && !fullRepo.HasIssues {
+						logger.Errorf("Repository %s/%s should have issues enable for automated branching.", org, repo)
+						failing.Insert(orgRepo)
+					}
+				}
+			}
+		} else {
+			logger.Infof("No release repository path was given, ignoring automated branching verification.")
 		}
 
 		if ignore.Has(org) || ignore.Has(orgRepo) {
