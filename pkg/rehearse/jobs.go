@@ -143,7 +143,7 @@ func makeRehearsalPresubmit(source *prowconfig.Presubmit, repo string, refs *pja
 				// from the target repo with all the "extra" fields from the job
 				// config, like path_alias, then remove them from the config so we
 				// don't use them in the future for any other refs
-				rehearsal.ExtraRefs = append(rehearsal.ExtraRefs, *pjutil.CompletePrimaryRefs(pjapi.Refs{
+				var extraRef = *pjutil.CompletePrimaryRefs(pjapi.Refs{
 					Org:            jobOrg,
 					Repo:           jobRepo,
 					BaseRef:        branch,
@@ -152,7 +152,24 @@ func makeRehearsalPresubmit(source *prowconfig.Presubmit, repo string, refs *pja
 					CloneURI:       rehearsal.CloneURI,
 					SkipSubmodules: rehearsal.SkipSubmodules,
 					CloneDepth:     rehearsal.CloneDepth,
-				}, source.JobBase))
+				}, source.JobBase)
+
+				// some periodic jobs already have an extra_ref that will create
+				// a conflict for clonerefs, we should add an extra ref only
+				// if there is no other extra ref with the same org/repo.
+				extraRefIdx := -1
+				for i := range rehearsal.ExtraRefs {
+					if rehearsal.ExtraRefs[i].Org == jobOrg && rehearsal.ExtraRefs[i].Repo == jobRepo {
+						extraRefIdx = i
+						break
+					}
+				}
+				if extraRefIdx == -1 {
+					rehearsal.ExtraRefs = append(rehearsal.ExtraRefs, extraRef)
+				} else {
+					rehearsal.ExtraRefs[extraRefIdx] = extraRef
+				}
+
 				rehearsal.PathAlias = ""
 				rehearsal.CloneURI = ""
 				rehearsal.SkipSubmodules = false
