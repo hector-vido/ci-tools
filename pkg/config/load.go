@@ -89,6 +89,9 @@ func (p *Prowgen) MergeDefaults(defaults *Prowgen) {
 func LoadProwgenConfig(folder string) (*Prowgen, error) {
 	var pConfig *Prowgen
 	path := filepath.Join(folder, ProwgenFile)
+	if strings.Contains(path, "ci-operator/config/openshift-kni/eco-ci-cd/") {
+		print("ci-operator/config/openshift-kni/eco-ci-cd/")
+	}
 	b, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("prowgen config found in path %s but couldn't read the file: %w", path, err)

@@ -324,6 +324,9 @@ func WriteToDir(jobDir, org, repo string, jobConfig *prowconfig.JobConfig, gener
 		allJobs.Insert(job.Name)
 		branch := MakeRegexFilenameLabel(job.ExtraRefs[0].BaseRef)
 		file := fmt.Sprintf("%s-%s-%s-periodics.yaml", org, repo, branch)
+		if strings.Contains(file, "3scale-qe-3scale-deploy-main-periodics.yaml") {
+			print(file)
+		}
 		if _, ok := files[file]; ok {
 			files[file].Periodics = append(files[file].Periodics, job)
 		} else {
@@ -336,6 +339,9 @@ func WriteToDir(jobDir, org, repo string, jobConfig *prowconfig.JobConfig, gener
 		return err
 	}
 	if err := OperateOnJobConfigSubdir(jobDirForComponent, "", make(sets.Set[string]), func(jobConfig *prowconfig.JobConfig, info *Info) error {
+		if strings.Contains(info.Filename, "3scale-qe-3scale-deploy-main-periodics.yaml") {
+			print(info.Filename)
+		}
 		file := filepath.Base(info.Filename)
 		if generated, ok := files[file]; ok {
 			delete(files, file)
@@ -450,6 +456,9 @@ func mergeJobConfig(destination, source *prowconfig.JobConfig, allJobs sets.Set[
 		var mergedJobs []prowconfig.Periodic
 		for newJobName := range newJobs {
 			newJob := newJobs[newJobName]
+			if newJobName == "periodic-ci-3scale-qe-3scale-deploy-main-3scale-amp-ocp4.13-lp-interop-3scale-amp-interop-aws" {
+				print(newJobName)
+			}
 			if oldJob, existed := oldJobs[newJobName]; existed {
 				mergedJobs = append(mergedJobs, mergePeriodics(&oldJob, &newJob))
 			} else {
@@ -521,9 +530,9 @@ func mergePeriodics(old, new *prowconfig.Periodic) prowconfig.Periodic {
 	merged.MaxConcurrency = old.MaxConcurrency
 	//TODO(sgoeddel): We will keep this functionality for backwards-compatibility.
 	// Eventually, we should only allow the reporter_config to be set through prowgen configuration
-	if old.ReporterConfig != nil && merged.ReporterConfig == nil {
-		merged.ReporterConfig = old.ReporterConfig
-	}
+	//if old.ReporterConfig != nil && merged.ReporterConfig == nil {
+	//	merged.ReporterConfig = old.ReporterConfig
+	//}
 	if old.Cluster != "" {
 		merged.Cluster = old.Cluster
 	}

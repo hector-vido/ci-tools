@@ -87,6 +87,9 @@ func GenerateJobs(configSpec *cioperatorapi.ReleaseBuildConfiguration, info *Pro
 					injectCapabilities(g.base.Labels, []string{string(element.NodeArchitecture)})
 				}
 
+				if orgrepo == "3scale-qe/3scale-deploy" {
+					print("ok")
+				}
 				periodic := GeneratePeriodicForTest(g, info, FromConfigSpec(configSpec), func(options *GeneratePeriodicOptions) {
 					options.Cron = cron
 					options.Capabilities = element.Capabilities
@@ -390,6 +393,16 @@ func GeneratePeriodicForTest(jobBaseBuilder *prowJobBaseBuilder, info *ProwgenIn
 		cron = "@yearly"
 		base.Labels[jc.ReleaseControllerLabel] = jc.ReleaseControllerValue
 	}
+	if slackReporter := info.Config.GetSlackReporterConfigForTest(base.Name, info.Metadata.Variant); slackReporter != nil {
+        if base.ReporterConfig == nil {
+            base.ReporterConfig = &prowv1.ReporterConfig{}
+        }
+        base.ReporterConfig.Slack = &prowv1.SlackReporterConfig{
+            Channel:           slackReporter.Channel,
+            JobStatesToReport: slackReporter.JobStatesToReport,
+            ReportTemplate:    slackReporter.ReportTemplate,
+        }
+    }
 	pj := &prowconfig.Periodic{
 		JobBase:         base,
 		Cron:            cron,
@@ -397,7 +410,7 @@ func GeneratePeriodicForTest(jobBaseBuilder *prowJobBaseBuilder, info *ProwgenIn
 		MinimumInterval: opts.MinimumInterval,
 		Retry:           opts.Retry,
 	}
-	injectCapabilities(pj.Labels, opts.Capabilities)
+   	injectCapabilities(pj.Labels, opts.Capabilities)
 	return pj
 }
 

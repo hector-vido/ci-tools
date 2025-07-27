@@ -141,6 +141,9 @@ func generateJobs(resolver registry.Resolver, cache map[string]*config.Prowgen, 
 			}
 			repoConfig = cache[orgRepo]
 		}
+		if strings.Contains(info.RepoPath, "3scale-qe/3scale-deploy") {
+			print(info.RepoPath)
+		}
 
 		switch {
 		case orgConfig != nil:
