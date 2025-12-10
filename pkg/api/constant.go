@@ -15,6 +15,9 @@ const (
 	GCSUploadCredentialsSecret          = "gce-sa-credentials-gcs-publisher"
 	GCSUploadCredentialsSecretMountPath = "/secrets/gcs"
 
+	S3UploadCredentialsSecret          = "ec2-sa-credentials-s3-publisher"
+	S3UploadCredentialsSecretMountPath = "/secrets/s3"
+
 	ManifestToolLocalPusherSecret          = "manifest-tool-local-pusher"
 	ManifestToolLocalPusherSecretMountPath = "/secrets/manifest-tool"
 

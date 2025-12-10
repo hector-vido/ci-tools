@@ -429,7 +429,8 @@ type options struct {
 	pushSecretPath string
 	pushSecret     *coreapi.Secret
 
-	uploadSecretPath string
+	gcsUploadSecretPath string
+	s3UploadSecretPath string
 	uploadSecret     *coreapi.Secret
 
 	cloneAuthConfig *steps.CloneAuthConfig
@@ -517,7 +518,8 @@ func bindOptions(flag *flag.FlagSet) *options {
 
 	flag.StringVar(&opt.pullSecretPath, "image-import-pull-secret", "", "A set of dockercfg credentials used to import images for the tag_specification.")
 	flag.StringVar(&opt.pushSecretPath, "image-mirror-push-secret", "", "A set of dockercfg credentials used to mirror images for the promotion.")
-	flag.StringVar(&opt.uploadSecretPath, "gcs-upload-secret", "", "GCS credentials used to upload logs and artifacts.")
+	flag.StringVar(&opt.gcsUploadSecretPath, "gcs-upload-secret", "", "GCS credentials used to upload logs and artifacts.")
+	flag.StringVar(&opt.s3UploadSecretPath, "s3-upload-secret", "", "S3-like credentials used to upload logs and artifacts.")
 
 	flag.StringVar(&opt.hiveKubeconfigPath, "hive-kubeconfig", "", "Path to the kubeconfig file to use for requests to Hive.")
 
@@ -588,7 +590,7 @@ func (o *options) Complete() error {
 	} else {
 		var opener prowio.Opener
 		if _, set := os.LookupEnv(configSpecGcsUrlVar); set { // The opener is only needed when we may have to read from a GCS bucket
-			opener, err = prowio.NewOpener(context.Background(), o.uploadSecretPath, "")
+			opener, err = prowio.NewOpener(context.Background(), o.gcsUploadSecretPath, "")
 			if err != nil {
 				logrus.WithError(err).Fatalf("Error creating opener to read %s", configSpecGcsUrlVar)
 			}
@@ -730,12 +732,20 @@ func (o *options) Complete() error {
 		}
 	}
 
-	if o.uploadSecretPath != "" {
+	if o.gcsUploadSecretPath != "" {
 		gcsSecretName := resolveGCSCredentialsSecret(o.jobSpec)
-		if o.uploadSecret, err = getSecret(gcsSecretName, o.uploadSecretPath); err != nil {
-			return fmt.Errorf("could not get upload secret %s from path %s: %w", gcsSecretName, o.uploadSecretPath, err)
+		if o.uploadSecret, err = getSecret(gcsSecretName, o.gcsUploadSecretPath); err != nil {
+			return fmt.Errorf("could not get upload secret %s from path %s: %w", gcsSecretName, o.gcsUploadSecretPath, err)
 		}
 	}
+
+	if o.s3UploadSecretPath != "" {
+		s3SecretName := resolveGCSCredentialsSecret(o.jobSpec)
+		if o.uploadSecret, err = getSecret(s3SecretName, o.s3UploadSecretPath); err != nil {
+			return fmt.Errorf("could not get upload secret %s from path %s: %w", s3SecretName, o.s3UploadSecretPath, err)
+		}
+	}
+
 
 	if o.hiveKubeconfigPath != "" {
 		kubeConfig, err := util.LoadKubeConfig(o.hiveKubeconfigPath)
@@ -2291,6 +2301,14 @@ func resolveGCSCredentialsSecret(jobSpec *api.JobSpec) string {
 	return api.GCSUploadCredentialsSecret
 }
 
+func resolveS3CredentialsSecret(jobSpec *api.JobSpec) string {
+	if jobSpec.DecorationConfig != nil && jobSpec.DecorationConfig.S3CredentialsSecret != nil {
+		return *jobSpec.DecorationConfig.S3CredentialsSecret
+	}
+
+	return api.S3UploadCredentialsSecret
+
+}
 func (o *options) getResolverInfo(jobSpec *api.JobSpec) *api.Metadata {
 	// address and variant can only be set via options
 	info := &api.Metadata{Variant: o.variant}
